@@ -33,10 +33,3 @@ The cleaned dataset was combined by separate CSV files from 2019 and 2020. The `
 2.  Does a country's score on the Environmental Performance Index (EPI) predict the proportion of single-use plastics found relative to total plastic collected?
 
 ## Visualization Sketches
-
-
-
-
-```{r}
-head(plastics)
-```
