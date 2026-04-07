@@ -1,0 +1,30 @@
+---
+title: "Project 1 Checkpoint 1"
+author: "Brett Van"
+format: html
+---
+
+## Data Context
+
+The dataset represents a global movement demanding reductions in single-use plastics and comes from the Break Free from Plastic audi which has a collection of data on plastic waste. It was compiled from brand audits conducted in 2019 and 2020 to identify and hold corporations accountable for plastic waste and to raise awareness about plastic pollution globally. Volunteers around the world have collected and categorized plastic waste by company and plastic type. Each row in the dataset represents the plastic waste collected from a specific company in a specific country during a specific year.
+
+## Data Cleaning
+
+The cleaned dataset was combined by separate CSV files from 2019 and 2020. The `grand_total` column in the 2020 data was stored as a character and converted to numeric using `parse_number()`. Several columns were renamed for consistency between years, including `parent_co_final` -\> `parent_company`, `number_of_events` -\> `num_events`, and `number_of_volunteers` -\> `volunteers`. A `year` variable was created and added to each dataset before combining. The `pp` (polypropylene) and `ps` (polystyrene) columns in the 2019 data had duplicate columns that were combined into single columns. The two years were combined by using \`bind_rows(). Plastic types are stored in wide format across multiple columns.
+
+## Research Questions
+
+### Questions Using Our Data
+
+1.  
+
+2.  
+
+### Questions Using Supplemental Data
+
+1.  
+
+2.  
+
+## Visualization Sketches
+
