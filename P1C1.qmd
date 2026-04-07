@@ -6,7 +6,7 @@ format: html
 
 ## Data Context
 
-The dataset represents a global movement demanding reductions in single-use plastics and comes from the Break Free from Plastic audi which has a collection of data on plastic waste. It was compiled from brand audits conducted in 2019 and 2020 to identify and hold corporations accountable for plastic waste and to raise awareness about plastic pollution globally. Volunteers around the world have collected and categorized plastic waste by company and plastic type. Each row in the dataset represents the plastic waste collected from a specific company in a specific country during a specific year.
+The dataset represents a global movement demanding reductions in single-use plastics and comes from the Break Free from Plastic audi which has a collection of data on plastic waste. It was compiled from brand audits conducted in 2019 and 2020 to identify and hold corporations accountable for plastic waste and to raise awareness about plastic pollution globally. Volunteers around the world have collected and categorized plastic waste by parent company and plastic type. Each row in the dataset represents the plastic waste collected from a specific company in a specific country during a specific year.
 
 ## Data Cleaning
 
@@ -16,15 +16,14 @@ The cleaned dataset was combined by separate CSV files from 2019 and 2020. The `
 
 ### Questions Using Our Data
 
-1.  
+1.  Is there a relationship between the number of volunteers at a cleanup event and the total amount of plastic collected?
 
-2.  
+2.  Has the total plastic waste attributed to the top 10 parent companies changed between 2019 and 2020 and does this vary by country?
 
 ### Questions Using Supplemental Data
 
-1.  
+1. Do countries with higher GDP per capita collect less plastic waste per volunteer?
 
-2.  
+2. Does a country's score on the Environmental Performance Index (EPI) predict the proportion of single-use plastics found relative to total plastic collected?
 
 ## Visualization Sketches
-
