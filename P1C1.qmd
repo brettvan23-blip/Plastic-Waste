@@ -4,6 +4,13 @@ author: "Brett Van"
 format: html
 ---
 
+```{r}
+tuesdata <- tidytuesdayR::tt_load('2021-01-26')
+tuesdata <- tidytuesdayR::tt_load(2021, week = 5)
+
+plastics <- tuesdata$plastics
+```
+
 ## Data Context
 
 The dataset represents a global movement demanding reductions in single-use plastics and comes from the Break Free from Plastic audi which has a collection of data on plastic waste. It was compiled from brand audits conducted in 2019 and 2020 to identify and hold corporations accountable for plastic waste and to raise awareness about plastic pollution globally. Volunteers around the world have collected and categorized plastic waste by parent company and plastic type. Each row in the dataset represents the plastic waste collected from a specific company in a specific country during a specific year.
@@ -22,8 +29,8 @@ The cleaned dataset was combined by separate CSV files from 2019 and 2020. The `
 
 ### Questions Using Supplemental Data
 
-1. Do countries with higher GDP per capita collect less plastic waste per volunteer?
+1.  Do countries with higher GDP per capita collect less plastic waste per volunteer?
 
-2. Does a country's score on the Environmental Performance Index (EPI) predict the proportion of single-use plastics found relative to total plastic collected?
+2.  Does a country's score on the Environmental Performance Index (EPI) predict the proportion of single-use plastics found relative to total plastic collected?
 
 ## Visualization Sketches
