@@ -1,0 +1,35 @@
+---
+title: "Project 1 Checkpoint 2"
+author: "Brett Van"
+format: html
+---
+
+```{r}
+library(tidyverse)
+library(gt)
+tuesdata <- tidytuesdayR::tt_load('2021-01-26')
+tuesdata <- tidytuesdayR::tt_load(2021, week = 5)
+
+plastics <- tuesdata$plastics
+```
+
+## Summary 1 Unmodified Column with Iteration
+
+```{r}
+#total plastic per country for a given year
+total_by_country <- function(yr) {
+  plastics |>
+    filter(year == yr, parent_company == "Grand Total") |>
+    select(country, year, grand_total, volunteers) |>
+    slice_max(grand_total, n = 10)
+}
+
+map(c(2019, 2020), total_by_country) |>
+  bind_rows() |>
+  gt::gt()
+```
+
+
+
+
+
