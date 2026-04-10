@@ -13,23 +13,83 @@ tuesdata <- tidytuesdayR::tt_load(2021, week = 5)
 plastics <- tuesdata$plastics
 ```
 
-## Summary 1 Unmodified Column with Iteration
+## Summary 1 - How Many Countries Each Brand Appears in
+
+### Unmodified Column with custom function
 
 ```{r}
-#total plastic per country for a given year
-total_by_country <- function(yr) {
+brand_country_count <- function(brand) {
   plastics |>
-    filter(year == yr, parent_company == "Grand Total") |>
-    select(country, year, grand_total, volunteers) |>
-    slice_max(grand_total, n = 10)
+    filter(parent_company == brand,
+           grand_total > 0) |>
+    summarize(parent_company = brand,
+      n_countries    = n_distinct(country),
+      total_plastic  = sum(grand_total, na.rm = TRUE))
 }
 
-map(c(2019, 2020), total_by_country) |>
+# top 20 brands by total plastic
+top_brands <- plastics |>
+  filter(!parent_company %in% c("Grand Total", "Unbranded")) |>
+  group_by(parent_company) |>
+  summarize(total = sum(grand_total, na.rm = TRUE)) |>
+  slice_max(total, n = 20) |>
+  pull(parent_company)
+
+map(top_brands, brand_country_count) |>
   bind_rows() |>
+  arrange(desc(n_countries)) |>
   gt::gt()
 ```
 
+# Summary 2 - Plastic Type by Region
+
+### Unmodified column with Iteration
+
+```{r}
+library(countrycode)
+
+plastics_region <- plastics |>
+  filter(parent_company == "Grand Total") |>
+  mutate(region = countrycode(country, origin = "country.name", destination = "continent")) |>
+  filter(!is.na(region)) |>
+  pivot_longer(cols = hdpe:pvc, names_to  = "plastic_type", values_to = "count")
+
+type_by_region <- function(ptype) {
+  plastics_region |>
+    filter(plastic_type == ptype) |>
+    group_by(region) |>
+    summarize(plastic_type = ptype, total = sum(count, na.rm = TRUE), .groups = "drop") |>
+    mutate(prop = total / sum(total))
+}
+
+plastic_types <- c("hdpe", "ldpe", "pet", "pp", "ps", "pvc", "o")
+all_types <- map(plastic_types, type_by_region) |>
+  bind_rows()
+
+# For each region, find the dominant plastic type
+dominant_type <- all_types |>
+  group_by(region) |>
+  slice_max(total, n = 1) |>
+  select(region, dominant_type = plastic_type, dominant_total = total)
+
+all_types |>
+  arrange(plastic_type, desc(total)) |>
+  left_join(dominant_type, by = "region") |>
+  gt::gt()
+```
+
+# Summary 3 - 
+
+### Modified Columns with Custom Function
+
+```{r}
+
+```
 
 
+# Summary 4 - 
 
+### Modified Columns with Iteration
+```{r}
 
+```
