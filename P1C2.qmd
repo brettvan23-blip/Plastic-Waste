@@ -13,33 +13,41 @@ tuesdata <- tidytuesdayR::tt_load(2021, week = 5)
 plastics <- tuesdata$plastics
 ```
 
-## Summary 1 - How Many Countries Each Brand Appears in
+# Summary 1 - How Many Countries Each Brand Appears in
 
 ### Unmodified Column with custom function
 
+How do two brands compare in terms of their global reach, and how similar are their distributions of plastic waste across countries?
+
 ```{r}
-brand_country_count <- function(brand) {
-  plastics |>
-    filter(parent_company == brand,
-           grand_total > 0) |>
-    summarize(parent_company = brand,
-      n_countries    = n_distinct(country),
-      total_plastic  = sum(grand_total, na.rm = TRUE))
+compare_brands <- function(brand1, brand2) {
+  b1 <- plastics %>%
+    filter(parent_company == brand1) %>%
+    group_by(country) %>%
+    summarize(count1 = sum(grand_total, na.rm = TRUE), .groups = "drop")
+  
+  b2 <- plastics %>%
+    filter(parent_company == brand2) %>%
+    group_by(country) %>%
+    summarize(count2 = sum(grand_total, na.rm = TRUE), .groups = "drop")
+  
+  combined <- full_join(b1, b2, by = "country") %>%
+    mutate(
+      count1 = replace_na(count1, 0),
+      count2 = replace_na(count2, 0))
+  
+  tibble(
+    brand1 = brand1,
+    brand2 = brand2,
+    countries_brand1 = n_distinct(b1$country),
+    countries_brand2 = n_distinct(b2$country),
+    correlation = cor(combined$count1, combined$count2))
 }
 
-# top 20 brands by total plastic
-top_brands <- plastics |>
-  filter(!parent_company %in% c("Grand Total", "Unbranded")) |>
-  group_by(parent_company) |>
-  summarize(total = sum(grand_total, na.rm = TRUE)) |>
-  slice_max(total, n = 20) |>
-  pull(parent_company)
-
-map(top_brands, brand_country_count) |>
-  bind_rows() |>
-  arrange(desc(n_countries)) |>
-  gt::gt()
+compare_brands("The Coca-Cola Company", "PepsiCo")
 ```
+
+The function takes in two brands as inputs and filters the dataset separately for each one. It then groups the data by country and calculates the total plastic associated with each brand in each country. The two datasets are combined so that both brands’ values are aligned by country, and missing values are replaced with 0 to show that they werent there. The function calculates the number of countries each brand appears in and computes a correlation coefficient to measure how similarly the two brands are distributed across countries. The Coca-Cola Company and PepsiCo had a correlation coef of .3598 showing that there is a weak correlation in how they’re plastic waste is distributed across countries.
 
 # Summary 2 - Plastic Type by Region
 
@@ -70,6 +78,10 @@ results %>%
   mutate(across(-c(country, year, total_plastic_per_year_country), ~ round(.x, 3)))
 results
 ```
+
+Notes: I grouped the data by country and year, summed total plastic and summed the total of plastic type, and then calculated proportions. I used map() to iterate through each plastic type and combined the results, then reshaped the data to compare types side by side.
+
+Through this data I can see that in each country and year a few specific plastic types make up most of the total plastic waste, rather than contributing equally. For example, in Armenia the plastic type pet made up all of the country's plastic waste
 
 # Summary 3 - Plastic Pollution Score Per Company
 
@@ -107,10 +119,42 @@ map(top_companies, company_pollution_score) |>
   gt::gt()
 ```
 
-# Summary 4 -
+Notes: I created `pollution_score` column by multiplying each plastic type’s count by a recycling difficulty weight. I wrote a custom function `company_pollution_score()` that takes a company name as input, applies the weights, and returns the total score, total plastic count, and average score per piece. I used `map()` to iterate this function over the top 10 companies by total plastic and combined the results with `bind_rows()`.
+
+With this data, the ranking of companies changes depending on total_score or average score per piece. The Coca-Cola Company has the highest total score due to sheer volume, but a relatively low average score per piece of 1.13. In contrast, Unilever have a higher average score per piece, meaning the plastic they produce is harder to recycle even if their total volume is lower.
+
+# Summary 4 - Plastic Type Trend Over Time
 
 ### Modified Columns with Iteration
 
 ```{r}
+plastics_prop <- plastics |>
+  filter(!parent_company %in% c("Grand Total", "Unbranded", "null", "NULL")) |>
+  pivot_longer(
+    cols = hdpe:pvc,
+    names_to  = "plastic_type",
+    values_to = "count") |>
+  group_by(year, plastic_type) |>
+  summarize(total = sum(count, na.rm = TRUE), .groups = "drop") |>
+  group_by(year) |>
+  mutate(prop = total / sum(total)) |>
+  ungroup()
 
+type_trend <- function(ptype) {
+  plastics_prop |>
+    filter(plastic_type == ptype) |>
+    pivot_wider(
+      names_from  = year,
+      values_from = c(total, prop)) |>
+    mutate(
+      change_in_prop = prop_2020 - prop_2019,
+      direction      = if_else(change_in_prop > 0, "increased", "decreased"))
+}
+
+plastic_types <- c("hdpe", "ldpe", "pet", "pp", "ps", "pvc")
+
+map(plastic_types, type_trend) |>
+  bind_rows() |>
+  arrange(desc(abs(change_in_prop))) |>
+  gt::gt()
 ```
