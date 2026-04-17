@@ -1,0 +1,285 @@
+---
+title: "Project 1"
+format: html
+---
+
+# Checkpoint 1
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load('2021-01-26')
+tuesdata <- tidytuesdayR::tt_load(2021, week = 5)
+
+plastics <- tuesdata$plastics
+```
+## Data Context
+
+The dataset represents a global movement demanding reductions in single-use plastics and comes from the Break Free from Plastic audi which has a collection of data on plastic waste. It was compiled from brand audits conducted in 2019 and 2020 to identify and hold corporations accountable for plastic waste and to raise awareness about plastic pollution globally. Volunteers around the world have collected and categorized plastic waste by parent company and plastic type. Each row in the dataset represents the plastic waste collected from a specific company in a specific country during a specific year.
+
+## Data Cleaning
+
+The cleaned dataset was combined by separate CSV files from 2019 and 2020. The `grand_total` column in the 2020 data was stored as a character and converted to numeric using `parse_number()`. Several columns were renamed for consistency between years, including `parent_co_final` -\> `parent_company`, `number_of_events` -\> `num_events`, and `number_of_volunteers` -\> `volunteers`. A `year` variable was created and added to each dataset before combining. The `pp` (polypropylene) and `ps` (polystyrene) columns in the 2019 data had duplicate columns that were combined into single columns. The two years were combined by using \`bind_rows(). Plastic types are stored in wide format across multiple columns.
+
+## Research Questions
+
+### Questions Using Our Data
+
+1.  Is there a relationship between the number of volunteers at a cleanup event and the total amount of plastic collected?
+
+2.  Has the total plastic waste attributed to the top 10 parent companies changed between 2019 and 2020 and does this vary by country?
+
+### Questions Using Supplemental Data
+
+1.  Do countries with higher GDP per capita collect less plastic waste per volunteer?
+
+2.  Does a country's score on the Environmental Performance Index (EPI) predict the proportion of single-use plastics found relative to total plastic collected?
+
+## Visualization Sketches
+Posted on my GitHub Repository for Project 1
+
+
+# Checkpoint 2
+
+# Summary 1 - How Many Countries Each Brand Appears in
+
+### Unmodified Column with custom function
+
+How do two brands compare in terms of their global reach, and how similar their distributions of plastic waste across countries?
+
+```{r}
+library(tidyverse)
+library(gt)
+library(purrr)
+library(dplyr)
+library(tidyr)
+compare_brands <- function(brand1, brand2) {
+  b1 <- plastics %>%
+    filter(parent_company == brand1) %>%
+    group_by(country) %>%
+    summarize(count1 = sum(grand_total, na.rm = TRUE), .groups = "drop")
+  
+  b2 <- plastics %>%
+    filter(parent_company == brand2) %>%
+    group_by(country) %>%
+    summarize(count2 = sum(grand_total, na.rm = TRUE), .groups = "drop")
+  
+  combined <- full_join(b1, b2, by = "country") %>%
+    mutate(
+      count1 = replace_na(count1, 0),
+      count2 = replace_na(count2, 0))
+  
+  tibble(
+    brand1 = brand1,
+    brand2 = brand2,
+    countries_brand1 = n_distinct(b1$country),
+    countries_brand2 = n_distinct(b2$country),
+    correlation = cor(combined$count1, combined$count2)
+  )
+}
+
+compare_brands("The Coca-Cola Company", "PepsiCo")
+
+```
+
+Notes: The function takes in two brands as inputs and filters the dataset separately for each one. It then groups the data by country and calculates the total plastic associated with each brand in each country. The two datasets are combined so that both brands’ values are grouped by country, and missing values are replaced with 0 to show that they weren't there. The function calculates the number of countries each brand appears in and computes a correlation coefficient to measure how similarly the two brands are distributed across countries. The Coca-Cola Company and PepsiCo had a correlation coefficient of .3598, showing that there is a weak correlation in how their plastic waste is distributed across countries.
+
+# Summary 2 - Plastic Type by Region
+
+### Unmodified column with Iteration
+
+What is the plastic diversity index by country arranged in decreasing order?
+
+```{r}
+plastic_types <- c("pet", "hdpe", "ldpe", "pp", "ps", "pvc", "o", "empty")
+
+country_counts <- plastics %>%
+  group_by(country) %>%
+  summarise(across(all_of(plastic_types), \(x) sum(x, na.rm = TRUE)), .groups = "drop")
+
+results <- country_counts %>%
+  mutate(diversity = map_dbl(1:n(), function(i) {
+    counts <- as.numeric(country_counts[i, plastic_types])
+    props <- counts / sum(counts)
+    props <- props[props > 0]
+    -sum(props * log(props))})) %>%
+  select(country, diversity) %>%
+  arrange(desc(diversity))
+results
+```
+
+Notes: I computed a plastic type diversity index for each country, which measures how evenly plastic waste is spread across the 8 plastic types in the dataset. A higher score means many plastic types were found in roughly equal amounts, while a lower score means one or two types dominated.
+
+The United Kingdom ranked highest with a score of 1.74, meaning its plastic waste was spread relatively evenly across many material types. Countries with lower scores tended to be dominated by PET, which makes sense given that plastic beverage bottles are one of the most commonly collected items in brand audits.
+
+# Summary 3 - Plastic Pollution Score Per Company
+
+### Modified Columns with Custom Function
+
+What is the plastic pollution score for each brand based on how hard their plastic is to recycle?
+
+```{r}
+library(tidyverse)
+library(gt)
+
+recycle_weights <- c(pet=1, hdpe=2, pp=2, ldpe=3, o=4, ps=5, pvc=5)
+
+company_pollution_score <- function(company) {
+  plastics |>
+    filter(!parent_company %in% c("Grand Total", "Unbranded", "null", "NULL"),
+           parent_company == company) |>
+    mutate(pollution_score = hdpe*2 + ldpe*3 + pet*1 + 
+                             pp*2 + ps*5 + pvc*5 + o*4) |>
+    summarize(
+      parent_company = company,
+      total_score = sum(pollution_score, na.rm = TRUE),
+      total_plastic = sum(grand_total, na.rm = TRUE),
+      avg_score_per_piece = total_score / total_plastic)
+}
+
+top_companies <- plastics |>
+  filter(!parent_company %in% c("Grand Total", "Unbranded", "null", "NULL")) |>
+  group_by(parent_company) |>
+  summarize(total = sum(grand_total, na.rm = TRUE)) |>
+  slice_max(total, n = 10) |>
+  pull(parent_company)
+
+map(top_companies, company_pollution_score) |>
+  bind_rows() |>
+  arrange(desc(total_score)) |>
+  gt::gt()
+```
+
+Notes: I created `pollution_score` column by multiplying each plastic type’s count by a recycling difficulty weight. I wrote a custom function `company_pollution_score()` that takes a company name as input, applies the weights, and returns the total score, total plastic count, and average score per piece. I used `map()` to iterate this function over the top 10 companies by total plastic and combined the results with `bind_rows()`.
+
+With this data, the ranking of companies changes depending on total_score or average score per piece. The Coca-Cola Company has the highest total score due to sheer volume, but a relatively low average score per piece of 1.13. In contrast, Unilever has a higher average score per piece, meaning the plastic they produce is harder to recycle even if their total volume is lower.
+
+# Summary 4 - Plastic Type Trend Over Time
+
+### Modified Columns with Iteration
+
+How does the proportion of different plastic types differ across countries and change over time?
+
+```{r}
+plastic_type <- c("hdpe", "ldpe", "o", "pet", "pp", "ps", "pvc")
+
+results <- map_dfr(plastic_type, function(p){
+  plastics %>% group_by(country, year) %>%
+    summarize(
+      total_plastic_per_year_country = sum(grand_total, na.rm = TRUE),
+      type_count = sum(.data[[p]], na.rm = TRUE),
+      .groups = "drop") %>%
+    mutate(
+      plastic_type = p, 
+      proportion = type_count / total_plastic_per_year_country)})
+results <- results %>% 
+  select(country, year, total_plastic_per_year_country, plastic_type, proportion) %>%
+  pivot_wider(
+    names_from = plastic_type,
+    values_from = proportion)
+results %>%
+  mutate(across(-c(country, year, total_plastic_per_year_country), ~ round(.x, 3)))
+```
+
+Notes: I grouped the data by country and year, summed total plastic and summed the total of plastic type, and then calculated proportions. I used map() to iterate through each plastic type and combined the results, then reshaped the data to compare types side by side.
+
+Through this data I can see that in each country and year a few specific plastic types make up most of the total plastic waste, rather than contributing equally. For example, in Armenia the plastic type pet made up all of the country's plastic waste.
+
+
+# Checkpoint 3
+
+# New data: [Country Capitals](https://www.kaggle.com/datasets/nikitagrec/world-capitals-gps?resource=download)
+
+This data contains geographical information for countries and their capital cities worldwide. It includes the country name, country code, capital city name, and the latitude and longitude coordinates of each capital. We will use this data as a bridge dataset to connect our plastic pollution data to the air quality API, which requires geographic cooordinates as input. 
+
+
+Here's a snippet of the data set:
+```{r}
+country_data <- read_csv("concap.csv")
+head(country_data)
+```
+
+Below, we remove the unnecessary columns, keeping the country, capital, and coordinates columns, and then combine the new data with our existing Plastic Waste data set.
+
+```{r}
+capitals <- country_data |>
+  select(c(1:4)) |>
+  rename("country" = "CountryName", 
+         "capital_city" = "CapitalName",
+         "capital_lat" = "CapitalLatitude",
+         "capital_long" = "CapitalLongitude"
+         )
+  
+pollution_data <- left_join(plastics, capitals, by = "country")
+
+```
+
+
+# New Data: [Air Quality API](https://api-ninjas.com/api/airquality)
+
+This dataset was acquired using the API Ninjas Air Quality API and returns current air quality measurements for a given latitude and longitude. For each country's capital city, the API returned measurements for several pollutants including CO, NO2, O3, PM2.5, PM10, and SO2, as well as an overall AQI (Air Quality Index) score. With this data, we can investigate whether countries with higher levels of plastic pollution also tend to have worse air quality, potentially reflecting broader environmental mismanagement. 
+
+
+We made a custom function get_air_quality() that pulls air quality data for a city from the API using its latitude and longitude coordinates. We then used the map() function to iterate over each capital city from the Capital Cities data set from above.
+
+```{r}
+#| eval: false
+
+# function to pull data from API
+get_air_quality <- function(lat, lon) {
+  
+  base_url <- "https://api.api-ninjas.com/v1/airquality"
+  
+  my_url <- glue("{base_url}?lat={lat}&lon={lon}")
+  
+  my_city <- GET(
+    my_url,
+    add_headers("X-Api-Key" = api_key)
+  )
+  
+  # Check for successful response
+  if (status_code(my_city) != 200) return(NA)
+  
+  my_data <- fromJSON(rawToChar(my_city$content))
+  
+  return (my_data)
+}
+
+# to prevent crashing in case of failed API value
+safe_air_quality <- possibly(get_air_quality, otherwise = NA)
+
+# iterate function for all capital cities
+unique_capitals <- pollution_data |> 
+  distinct(country, capital_lat, capital_long) |> 
+  filter(!is.na(capital_lat), !is.na(capital_long)) 
+
+# create tibble of air quality data
+air_data <- unique_capitals |> 
+  mutate(
+    air_quality = map2(capital_lat, capital_long, safe_air_quality)
+    ) |> 
+  unnest_wider(air_quality)
+
+# separate list objects into "pollutant"_concentration" and "pollutant"_aqi columns
+air_data <- air_data |>
+  unnest_wider(CO, names_sep = "_") |>
+  unnest_wider(NO2, names_sep = "_") |>
+  unnest_wider(O3, names_sep = "_") |>
+  unnest_wider(PM10, names_sep = "_") |>
+  unnest_wider(`PM2.5`, names_sep = "_") |>
+  unnest_wider(SO2, names_sep = "_") |>
+  select(-capital_lat, -capital_long)
+
+# create .csv file for air_data
+write_csv(air_data, "air_data.csv")
+
+```
+
+```{r}
+# read in air_data
+air_data <- read_csv(file = "air_data.csv")
+
+# combine
+pollution_data <- left_join(pollution_data, air_data, by = "country")
+pollution_data
+```
+
+
