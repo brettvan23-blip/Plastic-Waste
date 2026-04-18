@@ -6,36 +6,74 @@ format: html
 # Checkpoint 1
 
 ```{r}
+#| label: package-setup
+#| message: false
+#| warning: false
+
+library(httr)
+library(tidyjson)
+library(jsonlite)
+library(tidyverse)
+library(gt)
+library(glue)
+library(purrr)
+library(tidyr)
+library(readr)
+```
+
+# Introduction
+
+This Plastic Waste dataset is provided by [Break Free From Plastic](https://www.breakfreefromplastic.org/). Sarah Sauve was volunteering for her local Zero Waste Action Team when one of her colleagues proposed a local brand audit in St. Johns to contribute to the global audit as well as a larger project that was about understanding the sources of plastic in their city. She then used the 2019 and 2020 global audit data online and did some data cleaning and wrangling to better understand the global plastic pollution issue. User jonthegeek then used the same raw data prepped the data set in his own way.\
+
+Here is a snippet of the data set:
+
+```{r}
 tuesdata <- tidytuesdayR::tt_load('2021-01-26')
 tuesdata <- tidytuesdayR::tt_load(2021, week = 5)
 
 plastics <- tuesdata$plastics
+
+head(plastics)
 ```
-## Data Context
+Data from both 2019 and 2020 is included. This data was measured through volunteers physically collecting pieces of plastic and recording the type of plastic and company label. The observational unit here is one brand/company audited in one country in one year, described by the following variables:
 
-The dataset represents a global movement demanding reductions in single-use plastics and comes from the Break Free from Plastic audi which has a collection of data on plastic waste. It was compiled from brand audits conducted in 2019 and 2020 to identify and hold corporations accountable for plastic waste and to raise awareness about plastic pollution globally. Volunteers around the world have collected and categorized plastic waste by parent company and plastic type. Each row in the dataset represents the plastic waste collected from a specific company in a specific country during a specific year.
+- **country:** where the brand audit was conducted
+- **year:** year of the audit, 2019 or 2020
+- **parent company:** The company whose plastic waste was counted. "Unbranded" represents plastic without a known or identifiable brand.
+- **empty:** number of unlabeled pieces of plastic
+- **hdpe:** number of High-Density Polyethylene pieces
+- **ldpe:** number of Low-Density Polyethylene pieces
+- **o:** number of "other" types of plastic pieces that don't fall into the other categories
+- **pet:** number of Polyethylene Terephthalate pieces
+- **pp:** number of Polypropylene pieces
+- **ps:** number of Polystyrene pieces
+- **pvc:** number of Polyvinyl Chloride pieces
+- **grand total:** the total count of plastic pieces across all types for that country/brand/year audit
+- **num_events:** the number of clean-up events held
+- **volunteers:** the number of volunteers who participated in the audit
 
-## Data Cleaning
+# Data Cleaning
+jonthegeek used janitor to clean the data. He...
 
-The cleaned dataset was combined by separate CSV files from 2019 and 2020. The `grand_total` column in the 2020 data was stored as a character and converted to numeric using `parse_number()`. Several columns were renamed for consistency between years, including `parent_co_final` -\> `parent_company`, `number_of_events` -\> `num_events`, and `number_of_volunteers` -\> `volunteers`. A `year` variable was created and added to each dataset before combining. The `pp` (polypropylene) and `ps` (polystyrene) columns in the 2019 data had duplicate columns that were combined into single columns. The two years were combined by using \`bind_rows(). Plastic types are stored in wide format across multiple columns.
+- used janitor::clean_names() to standardize the column names without changing them manually,
+- converted grand_total into a character to deal with the commas that were included in the numbers and then removed the commas,
+- used set_names() and map_dfr() to with the .id argument to create the country column,
+- dropped duplicate pp and ps columns using select(), and
+- added a year column using rbind() to combine the 2019 and 2020 data into one data set.
 
-## Research Questions
+# Explorations
 
-### Questions Using Our Data
+## RQ 1: Does plastic type composition vary systematically by region?
 
-1.  Is there a relationship between the number of volunteers at a cleanup event and the total amount of plastic collected?
+Differences in PET vs. HDPE vs. PP across regions could reflect underlying patterns in local markets and waste infrastructure.
 
-2.  Has the total plastic waste attributed to the top 10 parent companies changed between 2019 and 2020 and does this vary by country?
+## RQ 2: Do the same big brands keep showing up together in the same countries?
 
-### Questions Using Supplemental Data
+Major, multi-national brands like Coca-Cola and Nestle appear across almost all countries. However, if they consistently cluster within the same countries, it could suggest that some markets are hot spots for plastic pollution, and spark the conversation of why that would be.
 
-1.  Do countries with higher GDP per capita collect less plastic waste per volunteer?
+# Visualizations
 
-2.  Does a country's score on the Environmental Performance Index (EPI) predict the proportion of single-use plastics found relative to total plastic collected?
-
-## Visualization Sketches
 Posted on my GitHub Repository for Project 1
-
 
 # Checkpoint 2
 
@@ -183,15 +221,14 @@ Notes: I grouped the data by country and year, summed total plastic and summed t
 
 Through this data I can see that in each country and year a few specific plastic types make up most of the total plastic waste, rather than contributing equally. For example, in Armenia the plastic type pet made up all of the country's plastic waste.
 
-
 # Checkpoint 3
 
-# New data: [Country Capitals](https://www.kaggle.com/datasets/nikitagrec/world-capitals-gps?resource=download)
+## New data: [Country Capitals](https://www.kaggle.com/datasets/nikitagrec/world-capitals-gps?resource=download)
 
-This data contains geographical information for countries and their capital cities worldwide. It includes the country name, country code, capital city name, and the latitude and longitude coordinates of each capital. We will use this data as a bridge dataset to connect our plastic pollution data to the air quality API, which requires geographic cooordinates as input. 
-
+This data contains geographical information for countries and their capital cities worldwide. It includes the country name, country code, capital city name, and the latitude and longitude coordinates of each capital. We will use this data as a bridge dataset to connect our plastic pollution data to the air quality API, which requires geographic cooordinates as input.
 
 Here's a snippet of the data set:
+
 ```{r}
 country_data <- read_csv("concap.csv")
 head(country_data)
@@ -212,11 +249,9 @@ pollution_data <- left_join(plastics, capitals, by = "country")
 
 ```
 
+## New Data: [Air Quality API](https://api-ninjas.com/api/airquality)
 
-# New Data: [Air Quality API](https://api-ninjas.com/api/airquality)
-
-This dataset was acquired using the API Ninjas Air Quality API and returns current air quality measurements for a given latitude and longitude. For each country's capital city, the API returned measurements for several pollutants including CO, NO2, O3, PM2.5, PM10, and SO2, as well as an overall AQI (Air Quality Index) score. With this data, we can investigate whether countries with higher levels of plastic pollution also tend to have worse air quality, potentially reflecting broader environmental mismanagement. 
-
+This dataset was acquired using the API Ninjas Air Quality API and returns current air quality measurements for a given latitude and longitude. For each country's capital city, the API returned measurements for several pollutants including CO, NO2, O3, PM2.5, PM10, and SO2, as well as an overall AQI (Air Quality Index) score. With this data, we can investigate whether countries with higher levels of plastic pollution also tend to have worse air quality, potentially reflecting broader environmental mismanagement.
 
 We made a custom function get_air_quality() that pulls air quality data for a city from the API using its latitude and longitude coordinates. We then used the map() function to iterate over each capital city from the Capital Cities data set from above.
 
@@ -273,6 +308,8 @@ write_csv(air_data, "air_data.csv")
 
 ```
 
+### Meta Dataset
+
 ```{r}
 # read in air_data
 air_data <- read_csv(file = "air_data.csv")
@@ -280,6 +317,38 @@ air_data <- read_csv(file = "air_data.csv")
 # combine
 pollution_data <- left_join(pollution_data, air_data, by = "country")
 pollution_data
+
 ```
 
+## Summary 1 
 
+We want to investigate whether countries with more plastic pollution also tend to have worse air quality. We grouped the meta dataset by country and computed the total plastic collected and average overall AQI score for each country. The table displays the top 10 countries by total plastic collected along with their corresponding air quality index, where a higher AQI indicates worse air quality. This allows us to see whether the most plastic-polluted countries also tend to have a poorer air quality. 
+
+```{r}
+air_vs_plastic <- pollution_data |>
+  filter(!parent_company %in% c("Grand Total", "Unbranded", "null", "NULL")) |>
+  group_by(country) |>
+  summarize(
+    total_plastic = sum(grand_total, na.rm = TRUE),
+    total_volunteers = sum(volunteers, na.rm = TRUE),
+    avg_aqi = mean(overall_aqi, na.rm = TRUE)) |>
+  filter(!is.na(avg_aqi), total_plastic > 0) |>
+  arrange(desc(total_plastic))
+
+air_vs_plastic |>
+  slice_max(total_plastic, n = 10)
+
+```
+
+Notes: We filtered out non-company rows such as "Grand Total" and "NULL"entries, then grouped by country and computed the total plastic collected, total volunteers, and average AQI score for each country using `summarize()`. Countries with missing AQI data or zero plastic collected were removed using `filter()`, results were sorted in descending order by total plastic using `arrange()`, and we displayed the top 10 countries using `slice_max()`.
+
+The results show no clear consistent pattern as the Philippines leads in both plastic collected and has a high AQI of 192, while Nigeria ranks second in plastic but has a very low AQI of 21. This suggests that plastic pollution and air quality are influenced by different factors across countries. 
+
+## Summary 2
+** Description **
+
+```{r}
+
+```
+
+Notes:
