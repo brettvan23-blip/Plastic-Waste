@@ -408,7 +408,7 @@ ggplot(data = air_vs_plastic |>
   ) +
   theme_minimal() +
   theme(
-    text = element_text(family = "Helvetica"),
+    text = element_text(family = "Arial"),
     plot.title = element_text(face = "bold", size = 14),
     plot.subtitle = element_text(colour = "black", size = 11),
     panel.grid.minor = element_blank(),
@@ -469,7 +469,7 @@ ggplot(brand_reach, aes(x = n_countries, y = parent_company)) +
 Notes: The chart displays the top 15 brands by number of countries they appear in across the 2019–2020 Break Free From Plastic brand audits. Each horizontal segment extends from zero to the number of countries that brand was recorded in, and the dot at the end is colored by total plastic collected (light pink indicating lower volume and hot pink indicating higher volume). I filtered out non-company entries such as "Grand Total" and "Unbranded", then grouping by parent_company and computing both n_distinct(country) and sum(grand_total) using `summarise()`. The Coca-Cola Company stands out clearly as both the most geographically widespread brand and the largest plastic polluter by volume, appearing in over 60 countries with a notably darker dot than all others. Interestingly, several brands like Mondelez International and Mars, Incorporated share a similar country count around 42 but with relatively low plastic volume, suggesting wide reach does not always correspond to high pollution output. Together, the chart confirms that a small set of multinational corporations consistently dominates plastic pollution across the globe.
 
 
-# Statistical Model
+# Model
 
 ```{r}
 model <- lm(avg_aqi ~ total_plastic, data = air_vs_plastic)
@@ -489,33 +489,34 @@ data.frame(
   Standard_Error = summary_model$coefficients[, 2],
   T_Statistic = summary_model$coefficients[, 3],
   P_Value = summary_model$coefficients[, 4]
-) %>%
-  gt() %>%
+) |>
+  gt() |>
+  opt_table_font(font = "Arial") |>
   tab_header(
     title = "Linear Regression Results",
     subtitle = "Predicting Average AQI from Total Plastic Waste by Country"
-  ) %>%
+  ) |>
   tab_spanner(
     label = "Coefficient Information",
     columns = c(Estimate, Standard_Error)
-  ) %>%
+  ) |>
   tab_spanner(
     label = "Test Statistics",
     columns = c(T_Statistic, P_Value)
-  ) %>%
+  ) |>
   cols_label(
     Term = "Term",
     Estimate = "Estimate",
     Standard_Error = "Standard Error",
     T_Statistic = "T-Statistic",
     P_Value = "P-Value"
-  ) %>%
+  ) |>
   tab_style(
     style = cell_text(weight = "bold"),
     locations = cells_column_labels()
-  ) %>%
-  fmt_number(columns = c(Estimate, Standard_Error, T_Statistic), decimals = 3) %>%
-  fmt_number(columns = P_Value, decimals = 4) %>%
+  ) |>
+  fmt_number(columns = c(Estimate, Standard_Error, T_Statistic), decimals = 3) |>
+  fmt_number(columns = P_Value, decimals = 4) |>
   tab_source_note(glue::glue("R² = {r_squared} | Adjusted R² = {adj_r_squared} | F-statistic = {f_stat} | Model p-value = {p_value_model}"))
 
 ```
