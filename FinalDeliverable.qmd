@@ -1,5 +1,6 @@
 ---
-title: "Final Project"
+title: "The Litter You Can See and the Air You Can't"
+subtitle: Brand audits from 70 countries name the corporations behind the world's plastic crisis. A separate   question — whether all that plastic also poisons the air — turns out to have a messier answer.
 format: 
   html:
     theme: cosmo
@@ -8,11 +9,15 @@ embed-resources: true
 
 ---
 
+<small>
+By Nitya Kolli, Sanskriti Khare, and Brett Viet Van
+</small>
+
 ```{r}
 #| label: package-setup
 #| message: false
 #| warning: false
-
+library(wesanderson)
 library(httr)
 library(tidyjson)
 library(jsonlite)
@@ -26,65 +31,32 @@ library(hexbin)
 library(ggplot2)
 ```
 
-# Introduction
+Pick up a piece of plastic litter almost anywhere in the world and there is a good chance it has a logo on it. The Break Free From Plastic organization has been proving this for years, recruiting volunteers in dozens of countries to collect trash and write down whose name is on it. The pattern that emerges is hard to ignore, a small set of multinational corporations appears on plastic waste from coastlines in West Africa to roadsides in Southeast Asia to beaches in Latin America. The types of plastic is different but the logos on it aren't.
 
-My dataset is the [Break Free From Plastic (BFFP)](https://github.com/rfordatascience/tidytuesday/blob/main/data/2021/2021-01-26/readme.mdz) from TidyTuesdays. This dataset looks at plastic waste collected during cleanup events around the world, where volunteers record variables like the country, year, parent company responsible, and counts of different plastic types.
+The plastic waste data was collected by Break Free From Plastic, a global movement working to end plastic pollution. The dataset used here was compiled by researcher Sarah Sauve, who combined BFFP's 2019 and 2020 global audit records into a single cleaned dataset published through the TidyTuesday open data project. Original cleaning was performed by jonthegeek, who standardized column names, resolved formatting issues in numeric fields, and merged both years into one file.
 
-The data comes from Break Free From Plastic global brand audits, which are organized to better understand where plastic pollution is coming from and to hold companies accountable. The dataset I'm using was put together by Sarah Sauve, who combined data from the 2019 and 2020 audits into one dataset. You find it [here](https://github.com/sarahsauve/TidyTuesdays/blob/master/BFFPDashboard/BlogPost.md).
-
-She also created a blog post and a Shiny app describing her data cleaning process and analysis. She made it to contribute to global audit, and as a way to understand plastic waste in St. John.
-
-Each observation represents a summary of plastic collected for a specific company, in a specific country, and year. The values in each row are counts of different types of plastic for each company.
-
-The different types of plastic are numeric, and they can be anywhere from 0 to a few hundred, depending on how common the material is.
-
-The data was collected to better understand where plastic pollution is coming from and to help hold companies accountable for their plastic waste. We are interested in it because it allows us to identify which companies and countries contribute the most to plastic pollution, and to examine how the composition of plastic types varies across countries and over time.
-
-Here is a snippet of the data set:
+Volunteers physically collected pieces of plastic at cleanup sites across 70 countries and recorded both the type of plastic and the brand name printed on each piece. Each observation in the dataset represents one parent company audited in one country in one year. The plastic types recorded span the major categories: High-Density Polyethylene (HDPE), Low-Density Polyethylene (LDPE), Polyethylene Terephthalate (PET), Polypropylene (PP), Polystyrene (PS), and Polyvinyl Chloride (PVC), along with the "other" category for plastics that did not fit a standard code and an "empty" count for unlabeled pieces. Each row also records the grand total of plastic pieces collected for that company, the number of cleanup events held, and the number of volunteers who participated. BFFP runs these audits specifically to hold corporations accountable for the plastic pollution they generate, documenting what ends up in the environment and whose name is on it, rather than relying on self-reported corporate data.
 
 ```{r}
-tuesdata <- tidytuesdayR::tt_load('2021-01-26')
-tuesdata <- tidytuesdayR::tt_load(2021, week = 5)
-
-plastics <- tuesdata$plastics
-
-head(plastics)
+plastics <- read.csv("plastics.csv")
 ```
 
-Data from both 2019 and 2020 is included. This data was measured through volunteers physically collecting pieces of plastic and recording the type of plastic and company label. The observational unit here is one brand/company audited in one country in one year, described by the following variables:
+## Two Questions, Two Stories
 
-- **country:** where the brand audit was conducted
-- **year:** year of the audit, 2019 or 2020
-- **parent company:** The company whose plastic waste was counted. "Unbranded" represents plastic without a known or identifiable brand.
-- **empty:** number of unlabeled pieces of plastic
-- **hdpe:** number of High-Density Polyethylene pieces
-- **ldpe:** number of Low-Density Polyethylene pieces
-- **o:** number of "other" types of plastic pieces that don't fall into the other categories
-- **pet:** number of Polyethylene Terephthalate pieces
-- **pp:** number of Polypropylene pieces
-- **ps:** number of Polystyrene pieces
-- **pvc:** number of Polyvinyl Chloride pieces
-- **grand total:** the total count of plastic pieces across all types for that country/brand/year audit
-- **num_events:** the number of clean-up events held
-- **volunteers:** the number of volunteers who participated in the audit
+**Do the same big brands keep showing up across countries, and which companies contribute the most plastic pollution?**
 
-## Data Cleaning
-jonthegeek used janitor to clean the data. He...
+**Is plastic waste associated with air quality across countries?**
 
-- used janitor::clean_names() to standardize the column names without changing them manually,
-- converted grand_total into a character to deal with the commas that were included in the numbers and then removed the commas,
-- used set_names() and map_dfr() to with the .id argument to create the country column,
-- dropped duplicate pp and ps columns using select(), and
-- added a year column using rbind() to combine the 2019 and 2020 data into one data set.
+The first question targets the brand audit data and asks both about geographic reach: do the same logos appear everywhere and about pollution quality, not just quantity. The second brings in external AQI data to test whether higher plastic pollution is linked to worse air quality. We will start with the first question by exploring the plastic pollution data and the brands most commonly associated with it.
 
-# Research Question: Do the same big brands keep showing up across countries, and which companies contribute the most plastic pollution?
+## Volume Isn't The Whole Story 
+The most obvious way to rank companies is by the total number of plastic pieces collected with their brand on them. But a company producing recyclable PET bottles is a meaningfully different environmental factor than one making hard-to-recycle foam packaging — even if their piece counts look similar. To capture this, each plastic type was assigned a recycling difficulty weight on a scale of 1 to 7, based on US Department of Energy data that can be found here <https://www.energy.gov/sites/default/files/2021-12/ES_ConsumerGuide_RecyclingCodes.pdf>. PET scores 1 as the easiest recycled plastic; other scores 7 as the most difficult recylable plastic. 
 
-This summary table shows which companies have the highest plastic pollution score based on recycling difficulty, and I want to see if they overlap with the brands most present across countries. I came up with these weights through an article from the US Department of Energy 
-<https://www.energy.gov/sites/default/files/2021-12/ES_ConsumerGuide_RecyclingCodes.pdf>
+**Table 1** shows the top companies ranked by this weighted pollution score. Multiplying each company’s plastic counts by the recycling difficulty weights produces a score that reflects not just how much plastic a company produces, but also how difficult that plastic is to recycle and manage after disposal.
 
-Table 1: shows which companies have the highest plastic pollution score based on recycling difficulty
+
 ```{r}
-recycle_weights <- c(pet=1, hdpe=2, pvc=3, o=4, pp=5, ps=6, ldpe=7)
+recycle_weights <- c(pet=1, hdpe=2, pvc=3, ldpe=4, pp=5, ps=6, o=7)
 
 top_companies <- plastics |>
   filter(!parent_company %in% c("Grand Total", "Unbranded", "null", "NULL")) |>
@@ -95,7 +67,7 @@ top_companies <- plastics |>
 
 plastics |>
   filter(parent_company %in% top_companies) |>
-  mutate(pollution_score = pet*1 + hdpe*2 + pvc*3 + o*4 + pp*5 + ps*6 + ldpe*7) |>
+  mutate(pollution_score = pet*1 + hdpe*2 + pvc*3 + ldpe*4 + pp*5 + ps*6 + o*7) |>
 
   group_by(parent_company) |>
   summarize(
@@ -112,24 +84,23 @@ plastics |>
     parent_company = "Company",
     total_score = "Total Score",
     total_plastic = "Total Plastic",
-    avg_score_per_piece = "Avg Score Per Piece"  # make sure this matches exactly
+    avg_score_per_piece = "Avg Score Per Piece"
   ) |>
   fmt_number(columns = c(total_score, total_plastic), decimals = 0) |>
   fmt_number(columns = avg_score_per_piece, decimals = 2) |>
   tab_style(
     style = cell_text(weight = "bold"),
     locations = cells_column_labels()) |>
-  tab_source_note("Source: Break Free From Plastic brand audit data (2019-2020). Weights based on recycling rates: PET(1), HDPE(2), PVC(3), Other(4), PP(5), PS(6), LDPE(7) from the US Department of Energy") 
+  tab_source_note("Source: Break Free From Plastic brand audit data (2019-2020). Weights based on recycling rates: PET(1), HDPE(2), PVC(3), LDPE(4), PP(5), PS(6), o(7) from the US Department of Energy") 
 
 ```
 
-Notes: The table ranks the top 10 companies by weighted plastic pollution score, where each plastic type is multiplied by a recycling difficulty weight ranging from 1 (PET, easiest) to 7 (LDPE, hardest) based on EPA recycling rates.
+The weighted scores change the rankings in interesting ways. Unilever has the highest pollution score even though it produces much less total plastic than The Coca-Cola Company (8,589 pieces compared to 25,530). This is because Unilever’s plastic tends to fall into categories that are harder to recycle, giving it a much higher average score per piece. Coca-Cola produces far more plastic overall, but much of it is PET plastic bottles, which are somewhat easier to recycle. The “Assorted” category, which includes plastic waste without visible brand labels, had over 6,101 pieces but received a score of zero because none of the items belonged to the weighted plastic categories.
 
-Universal Robina Corporation ranks highest in total score despite having far less plastic than Coca-Cola (8,651 vs 25,530 pieces), meaning their plastic is composed of harder to recycle types. This is reflected in their higher average score per piece of 4.59 compared to Coca-Cola's 1.33. Assorted has a total score of 0 despite 6,101 pieces, which means none of their plastic fell into a weighted category.
 
-We wanted to see here whether the same big brands kept showing up across countries.
+## Coca-Cola is Everywhere. Some Brands Are Quietly Everywhere Too.
 
-Figure 1: displays the top 15 brands by number of countries they appear in across the 2019–2020 Break Free From Plastic brand audits
+**Figure 1** shows the geographic reach of major plastic-polluting companies across countries. While volume and pollution score both measure how much plastic is collected, geographic reach measures how widespread a brand’s plastic waste is across countries. A company whose plastic appears in many countries has a broader global impact than one whose waste is found in only a few places.
 ```{r}
 brand_reach <- plastics |>
   filter(!parent_company %in% c("Grand Total", "Unbranded", "null", "NULL")) |>
@@ -167,118 +138,142 @@ ggplot(brand_reach, aes(x = n_countries, y = parent_company)) +
 
 ```
 
-Notes: The chart displays the top 15 brands by number of countries they appear in across the 2019–2020 Break Free From Plastic brand audits. Each horizontal segment extends from zero to the number of countries that brand was recorded in, and the dot at the end is colored by total plastic collected (light pink indicating lower volume and hot pink indicating higher volume). I filtered out non-company entries such as "Grand Total" and "Unbranded", then grouping by parent_company and computing both n_distinct(country) and sum(grand_total) using `summarise()`. The Coca-Cola Company stands out clearly as both the most geographically widespread brand and the largest plastic polluter by volume, appearing in over 60 countries with a notably darker dot than all others. Interestingly, several brands like Mondelez International and Mars, Incorporated share a similar country count around 42 but with relatively low plastic volume, suggesting wide reach does not always correspond to high pollution output. Together, the chart confirms that a small set of multinational corporations consistently dominates plastic pollution across the globe. 
+The Coca-Cola Company stands out on both measures, appearing in more than 60 of the 70 audited countries and also having the largest total amount of plastic collected. But some of the more interesting results appear in the middle of the chart. Mondelez International and Mars, Incorporated each appear in around 42 countries, even though their total plastic counts are much lower. This shows that a company can have a wide global presence in plastic pollution even without producing the highest total amount of waste. Overall, the chart suggests that a relatively small group of multinational companies repeatedly appears in plastic pollution audits around the world.
 
-Here, I wanted see how the proportion of different plastic types differ across countries and changed over time.
+## Who Leads In Each Country?
 
-Table 2: shows the proportion of each plastic type collected per country for both 2019 and 2020
+Looking across all the brands at once reveals the global pattern, but when we looked into individual countries it showed which specific company dominates locally and whether that changes from year to year. Table 2 focuses on four countries: the United States, India, the Philippines, and Mexico and identifies the top plastic-polluting brand in each for 2019 and 2020.
+
+
 ```{r}
-plastic_types <- c("hdpe", "ldpe", "o", "pet", "pp", "ps", "pvc")
 
-get_proportion <- function(p) {
+countries <- tibble(
+  country_name = c("United States of America", "India", "Philippines", "Mexico")
+)
+
+top_company <- function(country_name, year) {
   plastics |>
-    group_by(country, year) |>
+    filter(
+        country == country_name,
+        !parent_company %in% c("Grand Total", "Unbranded", "null", "NULL")
+    ) |>
+    group_by(year, parent_company) |>
     summarize(
       total_plastic = sum(grand_total, na.rm = TRUE),
-      type_count = sum(.data[[p]], na.rm = TRUE),
-      .groups = "drop") |>
-    mutate(
-      plastic_type = p,
-      proportion = type_count / total_plastic)
+      .groups = "drop"
+    ) |>
+    arrange(year, desc(total_plastic)) |>
+    group_by(year) |>
+    slice_head(n=1) |>
+    mutate(country = country_name,
+           .before = parent_company
+    ) 
 }
 
-map_dfr(plastic_types, get_proportion) |>
-  select(country, year, total_plastic, plastic_type, proportion) |>
-  pivot_wider(names_from = plastic_type, values_from = proportion) |>
-  mutate(across(-c(country, year, total_plastic), ~ round(.x, 3))) |>
-  pivot_wider(names_from = year, 
-              values_from = c(hdpe, ldpe, o, pet, pp, ps, pvc, total_plastic),
-              names_sep = "_") |>
-  filter(!is.na(total_plastic_2019) & !is.na(total_plastic_2020))|>
-  slice_head(n = 10) |> 
+country_table <- map_dfr(
+  countries$country_name,
+  top_company
+)
+country_table |>
   gt::gt() |>
   tab_header(
-    title = "Proportion of Plastic Types by Country and Year",
-    subtitle = "Each value represents the share of total plastic for that type"
+    title = "Top Plastic-Polluting Companies by Country and Year",
+    subtitle = "Top company in each selected country for 2019 and 2020"
   ) |>
-  tab_spanner(label = "2019", columns = ends_with("_2019")) |>
-  tab_spanner(label = "2020", columns = ends_with("_2020")) |>
   cols_label(
     country = "Country",
-    hdpe_2019 = "HDPE", ldpe_2019 = "LDPE", o_2019 = "Other",
-    pet_2019 = "PET", pp_2019 = "PP", ps_2019 = "PS", pvc_2019 = "PVC",
-    total_plastic_2019 = "Total Plastic",
-    hdpe_2020 = "HDPE", ldpe_2020 = "LDPE", o_2020 = "Other",
-    pet_2020 = "PET", pp_2020 = "PP", ps_2020 = "PS", pvc_2020 = "PVC",
-    total_plastic_2020 = "Total Plastic"
+    parent_company = "Company",
+    total_plastic = "Total Plastic",
   ) |>
   tab_style(
     style = cell_text(weight = "bold"),
     locations = cells_column_labels()
   ) |>
-  tab_source_note("Source: Break Free From Plastic brand audit data (2019-2020)") |>
-  fmt_number(columns = ends_with("_2019") | ends_with("_2020"), decimals = 2)
+  fmt_number(
+    columns = total_plastic,
+    decimals = 0,
+    sep_mark =","
+  )
+
+  
 ```
-Notes: The table shows the proportion of each plastic type collected per country for both 2019 and 2020, where each value represents that plastic type's share of the country's total plastic. PET dominates in many countries like Benin (1.00 in both years) meaning all their collected plastic was PET. Some countries show notable shifts between years, for example Australia went from 100% PET in 2019 to a more diverse mix in 2020. Bangladesh had 100% Other plastic in 2019 but shifted toward Other and HDPE in 2020.
+The results show that the top company in each country is not always the same from year to year. In Mexico, The Coca-Cola Company remained the top contributor in both 2019 and 2020, while other countries saw different companies leading each year. In the United States, PepsiCo had the highest total in 2019, but The Kroger Company led in 2020. In the Philippines, The Coca-Cola Company was the largest contributor in 2019, while Universal Robina Corporation ranked first in 2020 with more than 6,000 pieces of plastic collected. India also showed a shift, from SS Food Products in 2019 to Tamil Nadu Co-operative Milk Producers' Federation Ltd in 2020.
 
-Here, I wanted see how the proportion of different plastic types differ across countries and changed over time
-through a bar chart.
+These changes could reflect real differences in company plastic output, consumer behavior, or variation in where volunteers conducted cleanups. However, large multinational or nationally dominant consumer brands consistently appear near the top across countries and years. This suggests that plastic pollution is heavily connected to a relatively small group of large companies whose products are widely distributed and consumed.
 
-Figure 2: shows the proportion of each plastic type collected across the top 5 countries in 2019 and 2020
+## What Type Of Plastic and Is It Changing?
+
+Beyond identifying which companies are responsible for plastic pollution, the audit data also lets us examine the types of plastic found across countries and how those patterns changed between 2019 and 2020. This is important because some plastics are more harmful and harder to recycle than others. **Figure 2** focuses on four countries: India, the Philippines, Mexico, and the United States and shows the proportion of brands associated with each plastic type in each year.
 ```{r}
-top_countries <- plastics |>
-  filter(!parent_company %in% c("Grand Total", "Unbranded", "null", "NULL")) |>
-  group_by(country) |>
-  summarize(total = sum(grand_total, na.rm = TRUE)) |>
-  slice_max(total, n = 5) |>
-  pull(country)
+selected_countries <- c("India", "Philippines", "Mexico", "United States of America")
 
-map_dfr(plastic_types, get_proportion) |>
-  filter(country %in% top_countries) |>
-  ggplot(aes(x = plastic_type, y = proportion, fill = country)) +
+plastic_types <- c("hdpe", "ldpe", "o", "pet", "pp", "ps", "pvc")
+
+brand_plastic_prop <- plastics |>
+  filter(
+    country %in% selected_countries,
+    !is.na(parent_company),
+    !parent_company %in% c("Grand Total", "Unbranded", "null", "NULL")
+  ) |>
+  pivot_longer(
+    cols = all_of(plastic_types),
+    names_to = "plastic_type",
+    values_to = "count_type"
+  ) |>
+  filter(count_type > 0) |>
+  group_by(country, year, plastic_type) |>
+  summarize(
+    n_brands = n_distinct(parent_company),
+    .groups = "drop"
+  ) |>
+  group_by(country, year) |>
+  mutate(
+    proportion = n_brands / sum(n_brands)
+  ) |>
+  ungroup()
+
+ggplot(brand_plastic_prop,
+       aes(x = plastic_type, y = proportion, fill = country)) +
   geom_col(position = "dodge") +
   facet_wrap(~ year) +
   labs(
     title = "Plastic Type Proportions by Country Over Time",
+    subtitle = "Proportion of brands associated with each plastic type for selected countries",
     x = "Plastic Type",
-    y = "Proportion of Total Plastic",
+    y = "Proportion of Brands",
     fill = "Country",
-    alt = "Faceted bar chart showing the proportion of each plastic type collected in the top 5 polluting countries in 2019 and 2020. PET dominates across most countries and both years. Each country is represented by a different color. The chart is split into two panels, one for 2019 and one for 2020, allowing us to compare plastic type distributions over time."
-  ) +
-  scale_fill_brewer(palette = "wesanderson") +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(face = "bold", size = 14),
-    strip.text = element_text(face = "bold")
-  )
+    alt = "Grouped bar chart comparing selected countries across plastic types in 2019 and 2020. 
+    Each bar shows the proportion of brands associated with that plastic type in a country-year.
+    Other plastics appear most frequently across brands in several countries, while PS and PVC 
+    appear less comonly. 
+    Colors distinguish countries and the chart is separated by year."
+  ) + 
+  scale_fill_brewer(palette = "Set1") + 
+  theme_minimal()
 ```
 
-Notes: The chart shows the proportion of each plastic type collected across the top 5 countries in 2019 and 2020. PET dominates in most countries in 2019, while 2020 shows more variation with PP becoming more prominent in the Philippines. Overall the composition of the different plastic types shifted between years for several countries.
+
+***Figure 2** shows that the types of plastic found in each country are different and also changed somewhat between 2019 and 2020. In 2019, the “Other” plastic category made up a large share of the plastic linked to brands in all four countries, especially in the Philippines and Mexico. This is important because “Other” plastics are some of the hardest plastics to recycle. PP plastics seemed to have grown for many countries from 2019 to 2020 especially in Mexico and the Philippines and are also harder to recycle .
+
+The graph also shows that the mix of plastic types changed over time. For example, the Philippines had a very large amount of “Other” plastics in 2019, but more PP plastics in 2020. India also showed a more balanced mix of plastic types in 2020 compared to 2019. These changes could reflect real differences in packaging and plastic use, but they could also be affected by where volunteers collected waste.
+
+Overall, **Table 1**, **Table 2**, and **Figures 1** and **2** help answer the first research question. The results show that many of the same large companies appear across countries and years, but the amount of plastic alone does not tell the full story. The type of plastic matters too, since some plastics are much harder to recycle and more harmful to the environment. Knowing this information of plastic pollution patterns, we can now move to the second research question: whether countries with more plastic pollution also tend to have worse air quality.
+
+## From Plastic Waste to Air Quality
 
 
-# Research Question 2: Is plastic waste associated with air quality across countries?
+Answering this question requires connecting plastic waste totals to air quality measurements at the country level, which in turn requires geographic coordinates the original audit data does not contain. To bridge this gap, two additional datasets were brought in.
 
-## New data: [Country Capitals](https://www.kaggle.com/datasets/nikitagrec/world-capitals-gps?resource=download)
+The first additional dataset used in this analysis was the Country Capitals GPS dataset published on Kaggle by Nikita Grec.This dataset can be found here <https://www.kaggle.com/datasets/nikitagrec/world-capitals-gps?resource=download>. The exact organization that originally collected the data is not documented, but the dataset was publicly shared on Kaggle. The observational unit for this dataset is a country and its capital city. Each row contains the country name, capital city name, country code, and the latitude and longitude coordinates of the capital city. The dataset includes countries from around the world rather than one specific region. The year the data was collected wasnt mentioned, but the dataset contains up to date geographic information. The data was most likely gathered from publicly available geographic reference sources. This data is important because the latitude and longitude coordinates were needed to retrieve air quality measurements for each country.
 
-**Description: **
-The Country Capitals dataset was published on Kaggle by Nikita Grec and contains geographical information for countries and their capital cities worldwide. We do not know exactly how or when the data was originally collected, but it is publicly available on Kaggle.
-
-Each observation in the dataset represents a country, including the country name, country code, capital city name, and the latitude and longitude coordinates of that capital. The data covers countries worldwide, making it a complete geographic reference dataset.
-
-We used this dataset to connect our plastic pollution data and the Air Quality API. Since the API requires geographic coordinates as input, we joined the capital city coordinates to our plastics dataset by country name, allowing us to pull air quality measurements for each country in our analysis.
+The second dataset came from the API Ninjas Air Quality API found here <https://api-ninjas.com/api/airquality>. The observational unit for this dataset is a capital city location. The API returned measurements for pollutants such as carbon monoxide (CO), nitrogen dioxide (NO2), ozone (O3), PM2.5, PM10, sulfur dioxide (SO2), and an overall Air Quality Index (AQI) score.The API provides current air quality measurements for locations around the world, but the documentation does not clearly explain exactly how the original data were collected or where and when the measurements came from. The AQI is useful because it provides a standard measure of air quality where higher values indicate worse pollution. This data is important because it tracks air quality information around the world giving accurate information to people. This information allowed us to investigate whether countries with more plastic pollution also tend to have worse air quality, helping answer the second research question.
 
 
-Here's a snippet of the data set:
 ```{r}
-
+#| label: output
+#| output: false
 country_data <- read_csv("concap.csv")
 head(country_data)
-
-```
-
-Below, we remove the unnecessary columns, keeping the country, capital, and coordinates columns, and then combine the new data with our existing Plastic Waste data set.
-
-```{r}
 
 capitals <- country_data |>
   select(c(1:4)) |>
@@ -290,20 +285,6 @@ capitals <- country_data |>
   
 pollution_data <- left_join(plastics, capitals, by = "country")
 
-```
-
-## New Data: [Air Quality API](https://api-ninjas.com/api/airquality)
-
-**Description: **
-The air quality data was provided by API Ninjas, a platform that collects real-time environmental data from monitoring sources around the world. We do not know exactly which monitoring sources they come from, but the data is publicly accessible through their API endpoint.
-
-The data was collected at the country level using the capital city coordinates from our Country Capitals dataset as location inputs. This means each observation represents the air quality at a country's capital city rather than the country as a whole.
-
-The data was pulled in 2026. We collected it by sending HTTP requests to the API Ninjas Air Quality endpoint with latitude and longitude coordinates as inputs. For each location the API returned measurements for several pollutants including CO, NO2, O3, PM2.5, PM10, and SO2 as well as an overall Air Quality Index (AQI) score, where a higher AQI indicates worse air quality.
-
-We chose this data because it allows us to explore whether countries with more plastic pollution also tend to have worse air quality. By combining this with our plastic audit dataset we can investigate whether plastic pollution is connected to broader environmental issues at the country level.
-
-```{r}
 # read in air_data
 air_data <- read_csv(file = "air_data.csv")
 
@@ -311,10 +292,6 @@ air_data <- read_csv(file = "air_data.csv")
 pollution_data <- left_join(pollution_data, air_data, by = "country")
 head(pollution_data)
 
-```
-
-
-```{r}
 air_vs_plastic <- pollution_data |>
   filter(!parent_company %in% c("Grand Total", "Unbranded", "null", "NULL")) |>
   group_by(country) |>
@@ -330,7 +307,11 @@ air_vs_plastic |>
 
 ```
 
-Figure 3: bubble plot shows the relationship between total plastic waste and average Air Quality Index (AQI) for each country
+
+## The relationship is real, but weak
+
+**Figure 3** shows each country as a bubble, where larger bubbles represent more plastic pollution and the color shows the country’s air quality category. If plastic pollution and air pollution were strongly connected, we would expect the largest bubbles to mostly appear in the worst air quality categories.
+
 ```{r}
 Q1 <- quantile(air_vs_plastic$total_plastic, 0.25)
 Q3 <- quantile(air_vs_plastic$total_plastic, 0.75)
@@ -382,27 +363,33 @@ air_vs_plastic_clean |>
   ) +
   guides(size = "none")
 ```
-Notes: This bubble plot shows the relationship between total plastic waste and average Air Quality Index (AQI) for each country. Each bubble is one country, with bubble size representing how much plastic waste was collected and color showing the air quality category. Most countries are clustered in the bottom left, meaning they have relatively low plastic waste and moderate air quality. Countries with poor air quality appear across all levels of plastic waste, not just the high end, which suggests that plastic waste alone does not determine a country's air quality. A few labeled countries stand out as having surprisingly bad air quality despite low plastic waste totals, pointing to other factors at play. Overall, the plot shows that the relationship between plastic waste and air quality is weak and inconsistent across countries.
+Most countries appear in the lower-left part of the graph, meaning they have both lower plastic pollution and better air quality. However, countries with worse air quality appear across many different levels of plastic pollution. For example, United Arab Emirates has very poor air quality even though it has relatively low levels of plastic waste in the dataset, while Cameroon has one of the largest amounts of plastic waste but still shows good air quality. This suggests that plastic litter isn't a good indicator of poor air quality and is influenced by many factors.
 
-Table 3: groups countries into four quartiles based on their total plastic waste, from lowest (Q1) to highest (Q4)
+**Table 3** examines this pattern more closely by dividing countries into four groups based on how much plastic was collected, from the lowest levels to the highest, and then comparing air quality across those groups.
+
 ```{r}
 air_vs_plastic_clean |>
   mutate(
     plastic_quartile = case_when(
-      total_plastic <= quantile(total_plastic, 0.25) ~ "Low (Q1)",
-      total_plastic <= quantile(total_plastic, 0.50) ~ "Medium-Low (Q2)",
-      total_plastic <= quantile(total_plastic, 0.75) ~ "Medium-High (Q3)",
-      TRUE                                           ~ "High (Q4)"
+      total_plastic <= quantile(total_plastic, 0.25, na.rm = TRUE) ~ "Low (Q1)",
+      total_plastic <= quantile(total_plastic, 0.50, na.rm = TRUE) ~ "Medium-Low (Q2)",
+      total_plastic <= quantile(total_plastic, 0.75, na.rm = TRUE) ~ "Medium-High (Q3)",
+      TRUE ~ "High (Q4)"
     ),
-    plastic_quartile = factor(plastic_quartile, levels = c("Low (Q1)", "Medium-Low (Q2)", "Medium-High (Q3)", "High (Q4)"))
+    plastic_quartile = factor(
+      plastic_quartile,
+      levels = c("Low (Q1)", "Medium-Low (Q2)", "Medium-High (Q3)", "High (Q4)")
+    )
   ) |>
   group_by(plastic_quartile) |>
   summarise(
     n_countries = n(),
-    avg_aqi = round(mean(avg_aqi, na.rm = TRUE), 2),
+    average_aqi = round(mean(avg_aqi, na.rm = TRUE), 2),
     min_aqi = round(min(avg_aqi, na.rm = TRUE), 2),
-    max_aqi = round(max(avg_aqi, na.rm = TRUE), 2)
+    max_aqi = round(max(avg_aqi, na.rm = TRUE), 2),
+    .groups = "drop"
   ) |>
+  arrange(plastic_quartile) |>
   gt() |>
   opt_table_font(font = "Arial") |>
   tab_header(
@@ -412,7 +399,7 @@ air_vs_plastic_clean |>
   cols_label(
     plastic_quartile = "Plastic Waste Group",
     n_countries = "Number of Countries",
-    avg_aqi = "Average AQI",
+    average_aqi = "Average AQI",
     min_aqi = "Minimum AQI",
     max_aqi = "Maximum AQI"
   ) |>
@@ -421,24 +408,26 @@ air_vs_plastic_clean |>
     locations = cells_column_labels()
   ) |>
   data_color(
-    columns = avg_aqi,
-    colors = scales::col_numeric(
+    columns = average_aqi,
+    colors  = scales::col_numeric(
       palette = c("darkgreen", "yellow", "red"),
-      domain = NULL
+      domain  = NULL
     )
   ) |>
   tab_source_note("Note: Higher AQI indicates worse air quality. Countries filtered to remove outliers.")
 ```
-Notes: This table groups countries into four quartiles based on their total plastic waste, from lowest (Q1) to highest (Q4), and shows the average, minimum, and maximum AQI for each group. If plastic waste were strongly linked to air quality, we would expect average AQI to increase steadily from Q1 to Q4. The color scale makes it easy to spot whether that pattern holds, with green indicating better air quality and red indicating worse. Since the colors do follow a clear progression from green to red across the rows, it suggests that countries with more plastic waste do have worse air quality, not necessarily supporting the weak relationship seen in the bubble plot.
 
-Table 4: compares the 5 countries with the best air quality against the 5 countries with the worst air quality
+The quartiles do not show a clear pattern between plastic pollution and air quality. Average AQI values change from 103 to 99, then drop to 49 before increasing again to 71 as plastic pollution increases. This suggests there is not a strong relationship between the two variables. In Table 3, darker green values represent better air quality, yellow represents more moderate air quality, and red represents worse air quality. There is also a large range of AQI values within each group. For example, countries in the lowest plastic pollution group still range from very good air quality (AQI of 14) to very poor air quality (AQI of 221). This shows that countries with similar levels of plastic pollution can still have very different air quality conditions.
+
+To push this ecen further, **Table 4** puts the five countries with the cleanest air directly next to the five with the worst, with their plastic totals alongside. 
+
 ```{r}
-top_aqi <- air_vs_plastic_clean |>
+top_aqi <- air_vs_plastic |>
   arrange(desc(avg_aqi)) |>
   head(5) |>
   mutate(group = "Worst Air Quality")
 
-bottom_aqi <- air_vs_plastic_clean |>
+bottom_aqi <- air_vs_plastic |>
   arrange(avg_aqi) |>
   head(5) |>
   mutate(group = "Best Air Quality")
@@ -466,14 +455,20 @@ bind_rows(top_aqi, bottom_aqi) |>
   ) |>
   fmt_number(columns = c(avg_aqi, total_plastic), decimals = 2) |>
   tab_source_note("Note: Top and bottom 5 countries ranked by average AQI across 2019-2020.")
-
 ```
-Notes: This table compares the 5 countries with the best air quality against the 5 countries with the worst air quality, showing how much plastic waste each country produced. If plastic waste and air quality were strongly linked, we would expect the worst air quality countries to also have the highest plastic waste totals. Looking across both groups, if the plastic waste numbers are similar or inconsistent between the two groups, it suggests that other factors beyond plastic waste are driving air quality differences between countries.
 
-## Statistical Model
+Table 4 further shows that there is not a strong relationship between plastic pollution and air quality. Some of the countries with the worst air quality, such as United Arab Emirates, Japan, and Italy, have relatively low amounts of plastic waste in the dataset. For example, the United Arab Emirates has the highest AQI value at 221 but only 12 recorded pieces of plastic waste. At the same time, several countries with the best air quality, including Cameroon, Ghana, and Benin, have some of the largest plastic waste totals in the dataset. Cameroon has the best air quality with an AQI of 5 while also having more than 8,000 pieces of plastic waste collected.
 
-Figure 4: scatter plot shows the relationship between total plastic waste and average AQI for each country
+These results support our statements that higher plastic pollution does not necessarily correspond to worse air quality. Instead, air quality is likely affected more strongly by other factors like traffic, population density, and environmental regulations.
+
+
+## Putting A Number On It
+
+The charts make it pretty clear that plastic and air quality don't move together in any obvious way but to make sure we ran a simple linear regression. A simple linear regression was fit to test whether total plastic waste can predict a country's AQI. **Figure 4** shows what that looks like, with each country as a point and a trend line fitted through them.
+
+
 ```{r}
+
 Q1 <- quantile(air_vs_plastic$total_plastic, 0.25)
 Q3 <- quantile(air_vs_plastic$total_plastic, 0.75)
 IQR <- Q3 - Q1
@@ -491,7 +486,7 @@ ggplot(data = air_vs_plastic |>
     subtitle = "Each point represents one country. The red line shows the linear trend",
     x = "Total Plastic Waste",
     y = "Average Air Quality Index (AQI)",
-    alt = "Scatter plot showing the relationship between total plastic waste and average air quality index    across countries. Each point represents a country. A red linear trend line slopes slightly downward, showing  a weak negative relationship between plastic waste and air quality."
+    alt = "Scatter plot showing the relationship between total plastic waste and average air quality index    across countries. Each point represents a country. A red linear trend line slopes slightly downward, showing  a weak negative relationship between plastic waste and air quality.Adjusted for outliers."
   ) +
   theme_minimal() +
   theme(
@@ -505,9 +500,8 @@ ggplot(data = air_vs_plastic |>
 
 
 ```
-Notes: This scatter plot shows the relationship between total plastic waste and average AQI for each country, with outliers removed. Each green point is one country, and the red line shows the overall linear trend. The trend line slopes slightly downward, indicating a weak negative relationship between plastic waste and air quality. Countries with more plastic waste tend to have slightly lower AQI scores, meaning slightly better air quality. However, the points are scattered widely around the line, meaning this pattern is inconsistent across countries and plastic waste alone does not strongly predict air quality.
+After accounting for outliers the trend line slopes slightly downward which means countries with more plastic tend to have marginally better air, not worse. However the points are heavily scattered. The line cuts through AQI values ranging from near zero to over 200 at almost every plastic level. That is why next is the regression results in **Table 5**. 
 
-Table 5: table shows the results of a linear regression model predicting average AQI from total plastic waste across countries
 ```{r}
 model <- lm(avg_aqi ~ total_plastic, data = air_vs_plastic)
 summary_model <- summary(model)
@@ -557,4 +551,10 @@ data.frame(
   tab_source_note(glue::glue("R² = {r_squared} | Adjusted R² = {adj_r_squared} | F-statistic = {f_stat} | Model p-value = {p_value_model}"))
 
 ```
-Notes: This table shows the results of a linear regression model predicting average AQI from total plastic waste across countries. The estimate for Total Plastic is negative, confirming the weak negative relationship seen in the scatter plot. However, the R² value is very low, meaning total plastic waste explains very little of the variation in air quality across countries. The p-value for the Total Plastic coefficient indicates whether this negative relationship is statistically significant or likely due to chance.
+The coefficient on total plastic is essentially zero (0.001) with a p-value of 0.34, meaning the relationship is not statistically significant. We can't confidently say it's different from no relationship at all. The R² of 0.016 confirms it: plastic waste explains less than 2% of the variation in air quality across countries. The model's overall p-value of 0.34 tells the same story — this is not a meaningful predictor.
+
+What the intercept of 77.6 does tell us is that the average country in this dataset sits in the "moderate" AQI range regardless of how much plastic it produces. Air quality is being shaped by something else entirely — energy infrastructure, industrial activity, geography, agricultural burning — and plastic waste is barely registering in the equation.
+
+The answer to the second research question is straightforward: no, plastic waste is not meaningfully associated with air quality across countries. The pattern in the quartile table looked suggestive, but the regression makes clear it doesn't hold up.
+
+Plastic pollution is, at its core, a corporate accountability problem. The brand audit data makes that undeniable — the same small group of multinationals shows up on litter across 70 countries, and the plastic they produce is often harder to recycle than their packaging would suggest. Whether it also drives broader environmental harm like poor air quality is a harder question, and the data here gives a clear answer: not really. The countries breathing the worst air aren't necessarily the ones drowning in plastic, and plastic waste alone explains almost none of the variation in air quality worldwide. That doesn't make the litter less serious — it makes the problem more specific. The plastic on the ground has a logo on it. That's where the accountability should start.
