@@ -1,7 +1,7 @@
 ---
 title: "Plastic Waste Project"
 format:
-  dashboard:
+  dashboard: 
     theme: cosmo
     logo: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQTZuRREjunyFKk2gbvmSMWHEYi_KaBkjgR4w&s"
     nav-buttons:
@@ -45,7 +45,7 @@ library(ggplot2)
 #| warning: false
 
 # Load plastics
-plastics <- read.csv("plastics.csv")
+plastics <- read.csv("plastics.csv") 
 
 # Load country capitals
 country_data <- read_csv("concap.csv")
@@ -319,10 +319,10 @@ air_vs_plastic |>
 air_vs_plastic_clean |>
   mutate(
     plastic_quartile = case_when(
-      total_plastic <= quantile(total_plastic, 0.25) ~ "Low (Q1)",
-      total_plastic <= quantile(total_plastic, 0.50) ~ "Medium-Low (Q2)",
-      total_plastic <= quantile(total_plastic, 0.75) ~ "Medium-High (Q3)",
-      TRUE                                           ~ "High (Q4)"
+      total_plastic <= quantile(total_plastic, 0.25, na.rm = TRUE) ~ "Low (Q1)",
+      total_plastic <= quantile(total_plastic, 0.50, na.rm = TRUE) ~ "Medium-Low (Q2)",
+      total_plastic <= quantile(total_plastic, 0.75, na.rm = TRUE) ~ "Medium-High (Q3)",
+      TRUE ~ "High (Q4)"
     ),
     plastic_quartile = factor(
       plastic_quartile,
@@ -332,34 +332,37 @@ air_vs_plastic_clean |>
   group_by(plastic_quartile) |>
   summarise(
     n_countries = n(),
-    avg_aqi     = round(mean(avg_aqi, na.rm = TRUE), 2),
-    min_aqi     = round(min(avg_aqi,  na.rm = TRUE), 2),
-    max_aqi     = round(max(avg_aqi,  na.rm = TRUE), 2)
+    average_aqi = round(mean(avg_aqi, na.rm = TRUE), 2),
+    min_aqi = round(min(avg_aqi, na.rm = TRUE), 2),
+    max_aqi = round(max(avg_aqi, na.rm = TRUE), 2),
+    .groups = "drop"
   ) |>
+  arrange(plastic_quartile) |>
   gt() |>
+  opt_table_font(font = "Arial") |>
   tab_header(
-    title    = "Air Quality by Plastic Waste Level",
+    title = "Air Quality by Plastic Waste Level",
     subtitle = "Countries grouped into quartiles by total plastic waste"
   ) |>
   cols_label(
     plastic_quartile = "Plastic Waste Group",
-    n_countries      = "Countries",
-    avg_aqi          = "Avg AQI",
-    min_aqi          = "Min AQI",
-    max_aqi          = "Max AQI"
+    n_countries = "Number of Countries",
+    average_aqi = "Average AQI",
+    min_aqi = "Minimum AQI",
+    max_aqi = "Maximum AQI"
   ) |>
   tab_style(
-    style     = cell_text(weight = "bold"),
+    style = cell_text(weight = "bold"),
     locations = cells_column_labels()
   ) |>
   data_color(
-    columns = avg_aqi,
+    columns = average_aqi,
     colors  = scales::col_numeric(
       palette = c("darkgreen", "yellow", "red"),
       domain  = NULL
     )
   ) |>
-  tab_source_note("Note: Higher AQI = worse air quality. Outliers removed.")
+  tab_source_note("Note: Higher AQI indicates worse air quality.Countries filtered to remove outliers.")
 ```
 
 ## Model Results
@@ -469,19 +472,6 @@ p <- ggplot(combined, aes(x = year, y = fertility_rate, group = 1)) +
     vjust = -0.5,
     hjust = 0,
     size  = 3.5
-  ) +
-  annotate(
-    "text",
-    x     = max(combined$year),
-    y     = max(combined$fertility_rate, na.rm = TRUE),
-    label = paste0(
-      "Avg AQI: ", round(unique(combined$avg_aqi), 1),
-      "\nTotal Plastic: ",
-      scales::comma(unique(combined$total_plastic))
-    ),
-    hjust = 1,
-    size  = 3.5,
-    color = "darkred"
   ) +
   labs(
     title    = "Fertility Rate in the Philippines Over Time",
